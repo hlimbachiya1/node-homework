@@ -1,7 +1,7 @@
 const os = require("os");
 const path = require("path");
 const fs = require("fs");
-const fsPromises = require('fs/promises');
+const fsPromises = require("fs/promises");
 
 const sampleFilesDir = path.join(__dirname, "sample-files");
 if (!fs.existsSync(sampleFilesDir)) {
