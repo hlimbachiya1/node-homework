@@ -56,8 +56,10 @@ async function show(req, res, next) {
   try {
     const task = await prisma.task.findUniqueOrThrow({
       where: {
-        id: taskId,
-        userId: global.user_id,
+        id_userId: {
+          id: taskId,
+          userId: global.user_id,
+        },
       },
       select: { id: true, title: true, isCompleted: true },
     });
@@ -98,8 +100,10 @@ async function update(req, res, next) {
     const task = await prisma.task.update({
       data: value,
       where: {
-        id: taskId,
-        userId: global.user_id,
+        id_userId: {
+          id: taskId,
+          userId: global.user_id,
+        },
       },
       select: { id: true, title: true, isCompleted: true },
     });
@@ -127,8 +131,10 @@ async function deleteTask(req, res, next) {
   try {
     const task = await prisma.task.delete({
       where: {
-        id: taskId,
-        userId: global.user_id,
+        id_userId: {
+          id: taskId,
+          userId: global.user_id,
+        },
       },
       select: { id: true, title: true, isCompleted: true },
     });
