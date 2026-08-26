@@ -34,31 +34,63 @@ async function register(req, res, next) {
 
   const hashedPassword = await hashPassword(value.password);
 
-  let user;
   try {
-    user = await prisma.user.create({
-      data: {
-        email: value.email,
-        name: value.name,
-        hashedPassword,
-      },
-      select: { name: true, email: true, id: true },
+    const result = await prisma.$transaction(async (tx) => {
+      // Create user account
+      const newUser = await tx.user.create({
+        data: {
+          email: value.email,
+          name: value.name,
+          hashedPassword,
+        },
+        select: { id: true, name: true, email: true, createdAt: true },
+      });
+
+      // Create 3 welcome tasks using createMany
+      const welcomeTaskData = [
+        {
+          title: "Complete your profile",
+          userId: newUser.id,
+          priority: "medium",
+        },
+        { title: "Add your first task", userId: newUser.id, priority: "high" },
+        { title: "Explore the app", userId: newUser.id, priority: "low" },
+      ];
+      await tx.task.createMany({ data: welcomeTaskData });
+
+      // Fetch the created tasks to return them
+      const welcomeTasks = await tx.task.findMany({
+        where: {
+          userId: newUser.id,
+          title: { in: welcomeTaskData.map((t) => t.title) },
+        },
+        select: {
+          id: true,
+          title: true,
+          isCompleted: true,
+          userId: true,
+          priority: true,
+        },
+      });
+
+      return { user: newUser, welcomeTasks };
+    });
+
+    global.user_id = result.user.id;
+
+    res.status(201).json({
+      user: result.user,
+      welcomeTasks: result.welcomeTasks,
+      transactionStatus: "success",
     });
   } catch (err) {
-    if (err.name === "PrismaClientKnownRequestError" && err.code === "P2002") {
+    if (err.code === "P2002") {
       return res.status(400).json({
         message: "That email is already registered.",
       });
     }
     return next(err);
   }
-
-  global.user_id = user.id;
-
-  res.status(201).json({
-    name: user.name,
-    email: user.email,
-  });
 }
 
 async function logon(req, res) {
