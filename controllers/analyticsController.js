@@ -22,6 +22,13 @@ async function getUserAnalytics(req, res, next) {
       });
     }
 
+    // Access control: users can only view their own analytics
+    if (userId !== req.user.id) {
+      return res.status(404).json({
+        message: "User not found.",
+      });
+    }
+
     // Count tasks by completion status
     const taskStats = await prisma.task.groupBy({
       by: ["isCompleted"],

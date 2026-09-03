@@ -1,20 +1,37 @@
 const express = require("express");
+const cookieParser = require("cookie-parser");
+const helmet = require("helmet");
+const { xss } = require("express-xss-sanitizer");
+const rateLimiter = require("express-rate-limit");
 const timeRouter = require("./routes/timeRoutes");
 const userRoutes = require("./routes/userRoutes");
 const notFound = require("./middleware/not-found");
 const errorHandler = require("./middleware/error-handler");
-const authMiddleware = require("./middleware/auth");
+const jwtMiddleware = require("./middleware/jwtMiddleware");
 const taskRouter = require("./routes/taskRoutes");
 const analyticsRoutes = require("./routes/analyticsRoutes");
 //const pool = require("./db/pg-pool");
 const prisma = require("./db/prisma");
 const { Prisma } = require("@prisma/client");
 
-global.user_id = null;
-
 const app = express();
 
+app.set("trust proxy", 1);
+
+app.use(
+  rateLimiter({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // limit each IP to 100 requests per windowMs
+  }),
+);
+
+app.use(cookieParser());
+
+app.use(helmet());
+
 app.use(express.json());
+
+app.use(xss());
 
 app.get("/", (req, res) => {
   res.send("Hello, World!");
@@ -39,45 +56,46 @@ app.get("/health", async (req, res) => {
 
 app.use("/api", timeRouter);
 app.use("/api/users", userRoutes);
-app.use("/api/tasks", authMiddleware, taskRouter);
-app.use("/api/analytics", authMiddleware, analyticsRoutes);
+app.use("/api/tasks", jwtMiddleware, taskRouter);
+app.use("/api/analytics", jwtMiddleware, analyticsRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
 
 const port = process.env.PORT || 3000;
 
-let server;
+// Listen synchronously so module.exports gets a real server, not a
+// placeholder that only fills in later.
+const server = app.listen(port, () => {
+  console.log(`Server is listening on port ${port}...`);
+});
 
-async function start() {
-  try {
-    // Verify Prisma can actually connect before accepting traffic
-    await prisma.$connect();
+server.on("error", (err) => {
+  if (err.code === "EADDRINUSE") {
+    console.error(`Port ${port} is already in use.`);
+  } else {
+    console.error("Server error:", err);
+  }
+  process.exit(1);
+});
+
+// note for self:
+// Prisma connect verification, in parallel with accepting traffic.
+// Still exits the process on failure, per the Assignment 6 review —
+// just no longer blocks the initial `listen()` call to do it.
+prisma
+  .$connect()
+  .then(() => {
     console.log("Prisma connected to the database.");
-  } catch (err) {
+  })
+  .catch((err) => {
     if (err instanceof Prisma.PrismaClientInitializationError) {
       console.error("Failed to initialize Prisma Client:", err.message);
     } else {
       console.error("Unexpected error while connecting to the database:", err);
     }
     process.exit(1);
-  }
-
-  server = app.listen(port, () => {
-    console.log(`Server is listening on port ${port}...`);
   });
-
-  server.on("error", (err) => {
-    if (err.code === "EADDRINUSE") {
-      console.error(`Port ${port} is already in use.`);
-    } else {
-      console.error("Server error:", err);
-    }
-    process.exit(1);
-  });
-}
-
-start();
 
 let isShuttingDown = false;
 
@@ -88,15 +106,13 @@ async function shutdown(code = 0) {
   console.log("Shutting down gracefully...");
 
   try {
-    if (server) {
-      await new Promise((resolve, reject) => {
-        server.close((err) => {
-          if (err) reject(err);
-          else resolve();
-        });
+    await new Promise((resolve, reject) => {
+      server.close((err) => {
+        if (err) reject(err);
+        else resolve();
       });
-      console.log("HTTP server closed.");
-    }
+    });
+    console.log("HTTP server closed.");
     // await pool.end();
     // console.log("Database pool closed.");
     await prisma.$disconnect();

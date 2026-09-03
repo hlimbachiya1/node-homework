@@ -20,7 +20,7 @@ async function create(req, res) {
       title: value.title,
       isCompleted: value.isCompleted,
       priority: value.priority,
-      userId: global.user_id,
+      userId: req.user.id,
     },
     select: { id: true, title: true, isCompleted: true, priority: true },
   });
@@ -34,8 +34,7 @@ async function index(req, res) {
   const limit = parseInt(req.query.limit) || 10;
   const skip = (page - 1) * limit;
 
-  // Build where clause with optional search filter
-  const whereClause = { userId: global.user_id };
+  const whereClause = { userId: req.user.id };
 
   if (req.query.find) {
     whereClause.title = {
@@ -44,7 +43,6 @@ async function index(req, res) {
     };
   }
 
-  // Get tasks with pagination and eager loading of User info
   const tasks = await prisma.task.findMany({
     where: whereClause,
     select: {
@@ -99,7 +97,7 @@ async function show(req, res, next) {
       where: {
         id_userId: {
           id: taskId,
-          userId: global.user_id,
+          userId: req.user.id,
         },
       },
       select: {
@@ -155,7 +153,7 @@ async function update(req, res, next) {
       where: {
         id_userId: {
           id: taskId,
-          userId: global.user_id,
+          userId: req.user.id,
         },
       },
       select: { id: true, title: true, isCompleted: true, priority: true },
@@ -186,7 +184,7 @@ async function deleteTask(req, res, next) {
       where: {
         id_userId: {
           id: taskId,
-          userId: global.user_id,
+          userId: req.user.id,
         },
       },
       select: { id: true, title: true, isCompleted: true, priority: true },
@@ -225,7 +223,7 @@ async function bulkCreate(req, res, next) {
       title: value.title,
       isCompleted: value.isCompleted || false,
       priority: value.priority || "medium",
-      userId: global.user_id,
+      userId: req.user.id,
     });
   }
 
