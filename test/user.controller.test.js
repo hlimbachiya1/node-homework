@@ -39,6 +39,7 @@ describe("testing logon, register, and logoff", () => {
   it("33. register succeeds", async () => {
     const req = httpMocks.createRequest({
       method: "POST",
+      headers: { "X-Recaptcha-Test": process.env.RECAPTCHA_BYPASS },
       body: {
         name: "Carol Danvers",
         email: "carol@sample.com",
@@ -105,6 +106,7 @@ describe("testing logon, register, and logoff", () => {
   it("42. cant register an already-registered email", async () => {
     const req = httpMocks.createRequest({
       method: "POST",
+      headers: { "X-Recaptcha-Test": process.env.RECAPTCHA_BYPASS },
       body: {
         name: "Carol Danvers",
         email: "carol@sample.com",
