@@ -1,0 +1,84 @@
+   Deployed application URL: https://node-homework-bj37.onrender.com
+
+   **Deployed application:** https://node-homework-bj37.onrender.com
+
+### Extra Feature (Assignment 11): Google OAuth Logon
+
+I added Google OAuth logon using the front end’s existing `AuthGoogleButton` component. The component was already set up on the front end, but it was not functional because it was calling a backend route that did not exist yet.
+
+Users can now either register or log on with their Google account instead of using an email and password. No visible changes were needed on the front end.
+
+### How it works
+
+* The front end uses `@react-oauth/google` with the `auth-code` flow to obtain a Google authorization code and sends it to the backend.
+* The backend uses `google-auth-library` and `OAuth2Client` to exchange the authorization code for a Google ID token and verify it.
+* After verification, the backend gets the user’s name and email from the verified Google account.
+* If an account with that email already exists, the user is logged on using the same response format as `POST /api/users/logon`.
+* If the email does not already exist, a new account is created. A random, unguessable password hash is stored for the account so that a Google-created account cannot be accessed through password logon. The user must continue using Google to log on.
+* New Google users also receive the same three welcome tasks that are created during a normal registration.
+* In both cases, the existing JWT cookie and CSRF token system from Assignment 8 is used. This means that tasks, logoff, and other authenticated routes work the same way regardless of how the user originally logged on.
+
+### New API Route
+
+**POST `/api/users/googleLogon`**
+
+**Request body:**
+
+```json
+{
+  "code": "<Google authorization code from the front end>"
+}
+```
+
+**Responses:**
+
+* `200` — Existing user successfully logged on:
+
+```json
+{
+  "name": "...",
+  "email": "...",
+  "csrfToken": "..."
+}
+```
+
+* `201` — New user successfully registered:
+
+```json
+{
+  "user": {
+    "name": "...",
+    "email": "..."
+  },
+  "csrfToken": "...",
+  "welcomeTasks": "...",
+  "transactionStatus": "..."
+}
+```
+
+* `400` — Authorization code is missing:
+
+```json
+{
+  "message": "..."
+}
+```
+
+* `401` — Google authorization code could not be verified:
+
+```json
+{
+  "message": "..."
+}
+```
+
+The route sets the same HttpOnly `jwt` cookie used by `/api/users/logon` and `/api/users/register`. It does not use any query parameters.
+
+### Testing
+
+This feature cannot be meaningfully tested through Postman or Jest because it requires an actual Google sign-in to generate a valid authorization code. I tested it manually through the front end and confirmed both cases:
+
+1. A new user can register using Google.
+2. An existing user can log on using Google.
+
+Both cases were also verified against the Neon database.

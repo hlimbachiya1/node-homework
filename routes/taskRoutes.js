@@ -4,6 +4,7 @@ const taskController = require("../controllers/taskController");
 const router = express.Router();
 
 router.get("/", taskController.index);
+router.post("/bulk", taskController.bulkCreate);
 router.get("/:id", taskController.show);
 router.post("/", taskController.create);
 router.patch("/:id", taskController.update);
